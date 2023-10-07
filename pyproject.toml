@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+
+[tool.setuptools_scm]
+version_file = "__version__.py"
+
+[project.scripts]
+kbmod2dbase = "kbmod2dbase.main:run"
+
+[project]
+name = "kbmod2dbase"
+authors = [{ name = "JJ Kavelaars", email = "JJ.Kavelaars@nrc-cnrc.gc.ca" }]
+description = "kbmod2dbsae: A set of tools for turning KBMOD output into a dbase input."
+readme = "README.md"
+keywords = ["astronomy", "database"]
+license = { text= "GPLv3 or later" }
+dependencies = [
+    "astropy",
+    "numpy",
+    "mp_ephem"
+]
+classifiers = ["Programming Language :: Python :: 3"]
+dynamic = ["version"]

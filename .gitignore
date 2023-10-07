@@ -1,0 +1,14 @@
+/venv/
+__version__.py
+.idea/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.lock
+*.bak
+*.tmp
+*.log
+*.vscode/
+*.sublime-project
+kbmod2dbase.egg-info/
