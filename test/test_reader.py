@@ -12,31 +12,40 @@ from kbmod2dbase.reader import TrackingFile, KBModRecord, DiscoveryFile
 class TestTrackingFile(TestCase):
 
     def setUp(self) -> None:
-        tracking_lines = (
-            """35   1  59796.40457   640.00  3194.00   573.18  -207.56  23.51   311.24  334.531556  -12.492674   -4.377   -1.571
-   8   4  59796.40457    92.00  2757.00  -565.84   226.80  23.31   288.57  334.460907  -11.802132   -4.346   -1.788
-  13   3  59796.40457  2047.00  1465.00  -290.26   103.01  24.17   118.90  335.011083  -11.991661   -2.258   -0.813
-   0  12  59796.40457   965.00  2787.00  -244.77   129.25  24.79    59.14  335.399034  -11.799053   -1.862   -0.991""")
-        self.tracking_fobj = NamedTemporaryFile('w')
-        self.tracking_fobj.writelines(tracking_lines)
-        self.tracking_fobj.flush()
+        self.tracking_line = ("35   1  59796.40457   640.00  3194.00   573.18  -207.56  23.51 311.24"
+                              "  334.531556  -12.492674   -4.377   -1.571")
+        self.tracking_file_handle = NamedTemporaryFile('w')
+        self.tracking_file_handle.write(self.tracking_line + "\n")
+        self.tracking_file_handle.flush()
 
     def test_get_measure(self):
-        with TrackingFile('test', self.tracking_fobj.name) as d:
+        dec_rate = float(self.tracking_line.split()[12])
+        ra_rate = float(self.tracking_line.split()[11])
+
+        with TrackingFile('test', self.tracking_file_handle.name) as d:
+            obs1 = next(d)
+            for dt in [1.5*units.hour, 3*units.hour]:
+                obs2 = obs1.offset(dt)
+                dRA = (obs2.observation.coordinate.ra - obs1.observation.coordinate.ra).to('arcsec').value
+                dDEC = (obs2.observation.coordinate.dec - obs1.observation.coordinate.dec).to('arcsec').value
+                # print(math.cos(obs1.observation.coordinate.dec.to('rad').value)*dRA/dt.to('hour').value)
+                self.assertAlmostEqual(math.cos(obs1.observation.coordinate.dec.to('rad').value)*dRA,
+                                       ra_rate * dt.to('hour').value, 3)
+                self.assertAlmostEqual(dDEC, dec_rate * dt.to('hour').value, 3)
             for record in d:
-                print(record)
-                print(type(record))
                 self.assertAlmostEqual(record.x, 640.0 * units.pixel)
                 self.assertAlmostEqual(record.ra, 334.531556 * units.degree)
                 self.assertAlmostEqual(record.dec, -12.492674 * units.degree)
                 self.assertAlmostEqual(record.mag, 23.51 * units.mag)
+                self.assertAlmostEqual(record.observation.coordinate.dec, -12.492674 * units.degree)
+                self.assertAlmostEqual(record.observation.coordinate.ra, 334.531556 * units.degree)
                 self.assertAlmostEqual(
                     (record.ra_arc_rate - (-4.377 * units.arcsec / units.hour)).to('arcsec/hour').value,
-                    0.0)
+                    ra_rate, 3)
                 break
 
     def tearDown(self) -> None:
-        self.tracking_fobj.close()
+        self.tracking_file_handle.close()
 
 
 class TestKBModRecord(TestCase):
