@@ -90,7 +90,7 @@ class KBModRecord:
     observation: Observation = field(init=False)
 
     def __post_init__(self) -> None:
-        self.date = Time(self.mjd, format='mjd')
+        self.date = Time(self.mjd, format='mjd', precision=6)
         self.coord = SkyCoord(ra=self.ra, dec=self.dec, unit='deg', frame='icrs', obstime=self.date)
         self.frame = f"{self.survey_field}{self.date.strftime('%y%m%d')}{int(self.chip):02d}"
         self.observation = Observation(provisional_name=self.provisional_name,
@@ -99,7 +99,7 @@ class KBModRecord:
                                        mag=self.mag.to('mag').value,
                                        mag_err=self.merr.to('mag').value,
                                        xpos=self.x.to('pixel').value,
-                                       ypos=self.y,
+                                       ypos=self.y.to('pixel').value,
                                        ra=self.ra,
                                        dec=self.dec,
                                        date=self.date.mpc,
