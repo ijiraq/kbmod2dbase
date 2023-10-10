@@ -23,7 +23,6 @@ import re
 import inspect
 from collections import OrderedDict
 
-import orderdict
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 from astropy.units import Quantity
