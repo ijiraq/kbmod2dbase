@@ -18,6 +18,7 @@ chip index mjd x y dx/dt dy/dt mag likelihood ra dec cos(dec)*ra_arc_rate/dt dec
 
 #
 """
+import math
 import string
 import re
 import inspect
@@ -30,7 +31,7 @@ from mp_ephem.ephem import Observation
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 
-KEYS = string.ascii_uppercase + string.ascii_lowercase + string.digits
+KEYS = string.digits + string.ascii_uppercase + string.ascii_lowercase
 
 
 class MissingColumnsError(Exception):
