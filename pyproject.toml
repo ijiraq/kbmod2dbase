@@ -5,7 +5,8 @@ requires = ["setuptools", "setuptools-scm"]
 version_file = "__version__.py"
 
 [project.scripts]
-kbmod2dbase = "kbmod2dbase.main:run"
+kbmod2tnodb = "kbmod2dbase.kbmod2tnodb:main"
+kbmod_linker = "kbmod2dbase.linker:run"
 
 [project]
 name = "kbmod2dbase"

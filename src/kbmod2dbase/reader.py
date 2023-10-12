@@ -23,15 +23,14 @@ import re
 import inspect
 from collections import OrderedDict
 
-import orderdict
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 from astropy.units import Quantity
 from mp_ephem.ephem import Observation
 from dataclasses import dataclass, field
-from abc import ABC, abstractmethod
 
-KEYS = string.ascii_uppercase + string.ascii_lowercase + string.digits
+
+KEYS = string.digits + string.ascii_uppercase + string.ascii_lowercase
 
 
 class MissingColumnsError(Exception):
@@ -144,10 +143,13 @@ class KBModRecord:
                f"{self.mag} {self.merr} {self.likelihood}"
 
 
-class KBModFileIterator(ABC):
+class KBModFileIterator:
     """
     Open an iterator over a KBMOD file, there are two types of KBMOD files, Discovery and Tracking
     """
+    FIRST_ROW = OrderedDict()
+    OBSERVATION_COLUMNS = OrderedDict()
+    OBJECT_COLUMNS = OrderedDict()
 
     def __init__(self, survey_field, filename):
         self._line = None
@@ -157,14 +159,12 @@ class KBModFileIterator(ABC):
         self._file_object = None
 
     @property
-    @abstractmethod
     def observation_row_columns(self) -> OrderedDict:
-        pass
+        return self.OBSERVATION_COLUMNS
 
     @property
-    @abstractmethod
     def object_row_columns(self) -> OrderedDict:
-        pass
+        return self.OBJECT_COLUMNS
 
     @property
     def line(self):
@@ -254,60 +254,68 @@ class KBModFileIterator(ABC):
 class TrackingFile(KBModFileIterator):
     """
     Class to loop over tacking observation file from classy.
+       0  15  59815.34616  1120.00  4131.00  -367.97   132.79  26.74     8.93  335.070908  -12.000795   -2.807   -1.012
     """
 
-    @property
-    def observation_row_columns(self) -> OrderedDict:
-        return OrderedDict((('chip', None),
-                            ('index', None),
-                            ('mjd', 'day'),
-                            ('x', 'pixel'),
-                            ('y', 'pixel'),
-                            ('dx', 'pixel/day'),
-                            ('dy', 'pixel/day'),
-                            ('mag', 'mag'),
-                            ('likelihood', None),
-                            ('ra', 'degree'),
-                            ('dec', 'degree'),
-                            ('ra_arc_rate', 'arcsec/hour'),
-                            ('dec_arc_rate', 'arcsec/hour')))
+    OBSERVATION_COLUMNS = OrderedDict((('chip', None),
+                                       ('index', None),
+                                       ('mjd', 'day'),
+                                       ('x', 'pixel'),
+                                       ('y', 'pixel'),
+                                       ('dx', 'pixel/day'),
+                                       ('dy', 'pixel/day'),
+                                       ('mag', 'mag'),
+                                       ('likelihood', None),
+                                       ('ra', 'degree'),
+                                       ('dec', 'degree'),
+                                       ('ra_arc_rate', 'arcsec/hour'),
+                                       ('dec_arc_rate', 'arcsec/hour')))
 
-    @property
-    def object_row_columns(self) -> OrderedDict:
-        return OrderedDict()
+    OBJECT_COLUMNS = OrderedDict()
+    FIRST_ROW = OBSERVATION_COLUMNS
 
 
 class DiscoveryFile(KBModFileIterator):
     """
     Read in a Detection file.  Creates an iterator that returns sets of KBModRecords for the Discovery file
     """
-    OBJ_START_PATTERN = (r'\s*(?P<id>\d+)'
-                         r'\s+(?P<dist>\d+(\.\d*)?)'
-                         r'\s+(?P<mag>\d+(\.\d*)?)'
-                         r'\s+(?P<visit>\d+)'
-                         r'\s+(?P<chip>\d+)'
-                         r'\s+(?P<ndet>\d+)\s*')
-    OBJ_START_LINE = re.compile(OBJ_START_PATTERN)
-    OBJ_START_COLUMNS = "index dist mag visit chip ndet".split()
+    OBJECT_COLUMNS = OrderedDict((('index', None),
+                               ('dist', 'au'),
+                               ('mag', 'mag'),
+                               ('visit', None),
+                               ('chip', None),
+                               ('ndet', None)))
 
-    @property
-    def object_row_columns(self) -> OrderedDict:
-        return OrderedDict((('index', None),
-                            ('dist', 'au'),
-                            ('mag', 'mag'),
-                            ('visit', None),
-                            ('chip', None),
-                            ('ndet', None)))
+    OBSERVATION_COLUMNS = OrderedDict((('x', 'pixel'),
+                                       ('y', 'pixel'),
+                                       ('dx', 'pixel/hour'),
+                                       ('dy', 'pixel/hour'),
+                                       ('mag', 'mag'),
+                                       ('mjd', 'day'),
+                                       ('ra', 'degree'),
+                                       ('dec', 'degree'),
+                                       ('ra_arc_rate', 'arcsec/hour'),
+                                       ('dec_arc_rate', 'arcsec/hour')))
 
-    @property
-    def observation_row_columns(self) -> OrderedDict:
-        return OrderedDict((('x', 'pixel'),
-                            ('y', 'pixel'),
-                            ('dx', 'pixel/hour'),
-                            ('dy', 'pixel/hour'),
-                            ('mag', 'mag'),
-                            ('mjd', 'day'),
-                            ('ra', 'degree'),
-                            ('dec', 'degree'),
-                            ('ra_arc_rate', 'arcsec/hour'),
-                            ('dec_arc_rate', 'arcsec/hour')))
+    FIRST_ROW = OBJECT_COLUMNS
+
+
+def _get_first_line(filename) -> list:
+    with open(filename, 'r') as fobj:
+        while True:
+            first_line = fobj.readline().strip()
+            if first_line.startswith("#"):
+                continue
+            break
+    return first_line.split()
+
+
+def kbmod_file_iterator(survey_field: str, filename: str) -> KBModFileIterator:
+    """
+    Parse a KBMOD file and return a list of KBModRecord objects
+    """
+    for cls in KBModFileIterator.__subclasses__():
+        if len(cls.FIRST_ROW) == len(_get_first_line(filename)):
+            return cls(survey_field, filename)
+    raise ValueError(f"Unknown file format for {filename}")
+
