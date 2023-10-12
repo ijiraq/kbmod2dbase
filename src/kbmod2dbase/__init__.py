@@ -1,1 +1,1 @@
-from .reader import DiscoveryFile, TrackingFile
+from .reader import kbmod_file_iterator
