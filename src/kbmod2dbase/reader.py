@@ -19,8 +19,8 @@ chip index mjd x y dx/dt dy/dt mag likelihood ra dec cos(dec)*ra_arc_rate/dt dec
 #
 """
 import string
-import re
 import inspect
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 
 from astropy.time import Time
@@ -69,6 +69,7 @@ class KBModRecord:
     the classy pipeline using KBMod
     """
     survey_field: str  # "Name of the CLASSY field"
+    provisional_name: str # name of the object
     chip: int  # CCD number
     index: int  # "Index of the object in the field"
     mjd: Quantity  # "MJD of the observation"
@@ -89,7 +90,7 @@ class KBModRecord:
     observation: Observation = field(init=False)
 
     def __post_init__(self) -> None:
-        self.date = Time(self.mjd, format='mjd', precision=6)
+        self.date = Time(self.mjd, format='mjd', precision=5)
         self.coord = SkyCoord(ra=self.ra, dec=self.dec, unit='deg', frame='icrs', obstime=self.date)
         self.frame = f"{self.survey_field}{self.date.strftime('%y%m%d')}{int(self.chip):02d}"
         self.observation = Observation(provisional_name=self.provisional_name,
@@ -107,14 +108,6 @@ class KBModRecord:
                                        comment="",
                                        likelihood=self.likelihood)
 
-    @property
-    def provisional_name(self) -> str:
-        year_key = year_to_letter(self.date.datetime.year)
-        day = self.date.datetime.timetuple().tm_yday
-        ccd_key = chip_to_key(int(self.chip))
-        detection_index_key = index_to_key(int(self.index))
-        return f"{self.survey_field}{year_key}{day:03d}{ccd_key}{detection_index_key}"
-
     def offset(self, dt: Quantity) -> 'KBModRecord':
         """
         Return a new KBModRecord with the position offset by the velocity times dt
@@ -122,6 +115,7 @@ class KBModRecord:
         new_coord = self.coord.spherical_offsets_by(self.ra_arc_rate * dt,
                                                     self.dec_arc_rate * dt)
         return KBModRecord(survey_field=self.survey_field,
+                           provisional_name=self.provisional_name,
                            chip=self.chip,
                            index=self.index,
                            mjd=self.mjd + dt,
@@ -143,7 +137,7 @@ class KBModRecord:
                f"{self.mag} {self.merr} {self.likelihood}"
 
 
-class KBModFileIterator:
+class KBModFileIterator(ABC):
     """
     Open an iterator over a KBMOD file, there are two types of KBMOD files, Discovery and Tracking
     """
@@ -157,6 +151,10 @@ class KBModFileIterator:
         self.filename = filename
         self.survey_field = survey_field
         self._file_object = None
+
+    @abstractmethod
+    def get_provisional_name(self, measure) -> str:
+        raise NotImplementedError
 
     @property
     def observation_row_columns(self) -> OrderedDict:
@@ -225,6 +223,7 @@ class KBModFileIterator:
             self.next_line()
         measure = self._object_info.copy()
         measure.update(self.parse_line(self.observation_row_columns))
+        measure['provisional_name'] = self.get_provisional_name(measure)
         return measure
 
     def next_line(self) -> None:
@@ -274,6 +273,14 @@ class TrackingFile(KBModFileIterator):
     OBJECT_COLUMNS = OrderedDict()
     FIRST_ROW = OBSERVATION_COLUMNS
 
+    def get_provisional_name(self, measure) -> str:
+        date = Time(measure['mjd'], format='mjd', precision=5)
+        year_key = year_to_letter(date.datetime.year)
+        day = date.datetime.timetuple().tm_yday
+        ccd_key = chip_to_key(int(measure['chip']))
+        detection_index_key = index_to_key(int(measure['index']))
+        return f"{self.survey_field}{year_key}{day:03d}{ccd_key}{detection_index_key}"
+
 
 class DiscoveryFile(KBModFileIterator):
     """
@@ -288,16 +295,22 @@ class DiscoveryFile(KBModFileIterator):
 
     OBSERVATION_COLUMNS = OrderedDict((('x', 'pixel'),
                                        ('y', 'pixel'),
-                                       ('dx', 'pixel/hour'),
-                                       ('dy', 'pixel/hour'),
+                                       ('dx', 'pixel/day'),
+                                       ('dy', 'pixel/day'),
                                        ('mag', 'mag'),
                                        ('mjd', 'day'),
                                        ('ra', 'degree'),
                                        ('dec', 'degree'),
                                        ('ra_arc_rate', 'arcsec/hour'),
-                                       ('dec_arc_rate', 'arcsec/hour')))
+                                       ('dec_arc_rate', 'arcsec/hour'),
+                                       ('likelihood', None)))
 
     FIRST_ROW = OBJECT_COLUMNS
+
+    def get_provisional_name(self, measure) -> str:
+        detection_index_key = f"{int(measure['index']):03d}"
+        return f"{self.survey_field}{detection_index_key}"
+
 
 
 def _get_first_line(filename) -> list:

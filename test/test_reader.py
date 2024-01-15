@@ -79,10 +79,10 @@ class TestKBModRecord(TestCase):
 class TestDiscoveryFile(TestCase):
 
     def setUp(self) -> None:
-        self.discovery_lines = """   59 42.28  26.78 2 33 2
-122.0 2929.0 361.48 -149.56 26.37 59817.336190 334.425922 -12.645317 -2.791127 -1.150713
-83.0 2963.0 354.07 -166.35 27.18 59814.326828 334.481756 -12.622597 -2.732894 -1.279644"""
-
+        self.discovery_lines = """   4 236.80  25.89 0 2 2
+          788.0 4319.0 -75.67 -33.80 26.39 59963.288713 120.360236 21.571612 -0.588165 0.259929 5.2
+          1390.0 4394.0 -61.65 -28.30 25.39 59965.314781 120.352643 21.575596 -0.479325 0.217934 5.1
+        """
         self.discovery_file_obj = NamedTemporaryFile('w')
         self.discovery_file_obj.writelines(self.discovery_lines)
         self.discovery_file_obj.flush()
@@ -92,12 +92,12 @@ class TestDiscoveryFile(TestCase):
             for record in d:
                 print(record)
                 print(type(record))
-                self.assertAlmostEqual(record.x, 122.0 * units.pixel)
-                self.assertAlmostEqual(record.ra, 334.425922 * units.degree)
-                self.assertAlmostEqual(record.dec, -12.645317 * units.degree)
-                self.assertAlmostEqual(record.mag, 26.37 * units.mag)
+                self.assertAlmostEqual(record.x, 788.0 * units.pixel)
+                self.assertAlmostEqual(record.ra, 120.360236 * units.degree)
+                self.assertAlmostEqual(record.dec, 21.571612 * units.degree)
+                self.assertAlmostEqual(record.mag, 26.39 * units.mag)
                 self.assertAlmostEqual(
-                    (record.ra_arc_rate - (-2.791127 * units.arcsec / units.hour)).to('arcsec/hour').value,
+                    (record.ra_arc_rate - (-0.588165 * units.arcsec / units.hour)).to('arcsec/hour').value,
                     0.0)
                 break
 
