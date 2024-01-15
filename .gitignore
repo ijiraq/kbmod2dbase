@@ -1,4 +1,5 @@
 /venv/
+/build/
 __version__.py
 .idea/
 *.pyc
