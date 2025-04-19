@@ -13,3 +13,4 @@ __version__.py
 *.vscode/
 *.sublime-project
 kbmod2dbase.egg-info/
+.DS_Store
