@@ -6,7 +6,7 @@ from astropy import units
 from astropy.coordinates import SkyCoord
 from astropy.units import Quantity
 
-from kbmod2dbase.reader import TrackingFile, KBModRecord, DiscoveryFile
+from kbmod2dbase.reader import TrackingFile, KBModRecord, DiscoveryFile, GroupDiscoveryFile
 
 
 class TestTrackingFile(TestCase):
@@ -100,6 +100,73 @@ class TestDiscoveryFile(TestCase):
                     (record.ra_arc_rate - (-0.588165 * units.arcsec / units.hour)).to('arcsec/hour').value,
                     0.0)
                 break
+
+    def tearDown(self) -> None:
+        self.discovery_file_obj.close()
+
+class TestGroupFile(TestCase):
+
+    def setUp(self) -> None:
+        self.discovery_lines = """3 N123 WARNING: MULTI GROUP! G 
+        0 963.0 2257.0 335.115552 -11.883817 59813.360306 -1.18 -0.21 57 35.66 -1
+        0 1174.0 2170.0 335.107898 -11.88629 59814.330278 -1.1 -0.43 65 123.56 72979860
+        0 1762.0 1925.0 335.084753 -11.894749 59817.33964 -1.21 -0.47 85 144.38 72979860
+        """
+        self.discovery_file_obj = NamedTemporaryFile('w')
+        self.discovery_file_obj.writelines(self.discovery_lines)
+        self.discovery_file_obj.flush()
+
+    def test_get_measure(self):
+        with GroupDiscoveryFile('test', self.discovery_file_obj.name) as d:
+            for record in d:
+                self.assertAlmostEqual(record.x, 963.0 * units.pixel)
+                self.assertAlmostEqual(record.ra, 335.115552 * units.degree)
+                self.assertAlmostEqual(record.dec, -11.883817 * units.degree)
+                self.assertAlmostEqual(record.mjd, 59813.360306 * units.day)
+                self.assertAlmostEqual(record.likelihood, 35.66)
+                self.assertEqual(record.flag, 'G')
+                self.assertEqual(record.objid, -1)
+                self.assertAlmostEqual(
+                    (record.ra_arc_rate - (-1.18 * units.arcsec / units.hour)).to('arcsec/hour').value,
+                    0.0)
+                break
+
+    def tearDown(self) -> None:
+        self.discovery_file_obj.close()
+
+
+class TestGroupRejectedFile(TestCase):
+    """Rejected group files omit G/B flags and the trailing objid column."""
+
+    def setUp(self) -> None:
+        self.discovery_lines = """58 N13
+	0 274.0 1736.0 335.079198 -11.857041 59813.360306 -3.05 -0.94 10 5.90
+	0 150.0 1763.0 335.000477 -11.886194 59817.33964 -2.89 -1.13 7 9.00
+98 N23 WARNING: MULTI GROUP!
+	8 519.0 2074.0 334.181652 -11.884561 59814.330278 -2.65 -0.9 34 6.99
+	8 454.0 1992.0 334.124488 -11.901284 59817.33964 -2.73 -0.89 31 7.95
+"""
+        self.discovery_file_obj = NamedTemporaryFile('w')
+        self.discovery_file_obj.writelines(self.discovery_lines)
+        self.discovery_file_obj.flush()
+
+    def test_get_measure(self):
+        with GroupDiscoveryFile('AS1', self.discovery_file_obj.name) as d:
+            records = list(d)
+        self.assertEqual(len(records), 4)
+        first = records[0]
+        self.assertAlmostEqual(first.x, 274.0 * units.pixel)
+        self.assertAlmostEqual(first.ra, 335.079198 * units.degree)
+        self.assertAlmostEqual(first.dec, -11.857041 * units.degree)
+        self.assertAlmostEqual(first.mjd, 59813.360306 * units.day)
+        self.assertAlmostEqual(first.likelihood, 5.90)
+        self.assertEqual(first.flag, '_')
+        self.assertEqual(first.objid, 0)
+        self.assertEqual(first.detkey, 'N13')
+        last = records[-1]
+        self.assertEqual(last.index, 98)
+        self.assertEqual(last.detkey, 'N23')
+        self.assertIn('MULTI', last.comment)
 
     def tearDown(self) -> None:
         self.discovery_file_obj.close()
