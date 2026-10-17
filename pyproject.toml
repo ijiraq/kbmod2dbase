@@ -18,7 +18,8 @@ license = { text= "GPLv3 or later" }
 dependencies = [
     "astropy",
     "numpy",
-    "mp_ephem"
+    "mp_ephem",
+    "cadctap>=0.9.11",
 ]
 classifiers = ["Programming Language :: Python :: 3"]
 dynamic = ["version"]
